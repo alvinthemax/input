@@ -4,23 +4,44 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'interfaces', 'data.json');
 
-export default function handler(req, res) {
-  if (req.method === 'GET') {
-    try {
+export default async function handler(req, res) {
+  // No cache headers
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  
+  try {
+    // Debug logging
+    console.log('Request method:', req.method);
+    console.log('Data path exists:', fs.existsSync(dataPath));
+
+    if (req.method === 'GET') {
       const data = fs.readFileSync(dataPath, 'utf8');
-      res.status(200).json(JSON.parse(data));
-    } catch (error) {
-      res.status(500).json({ error: 'Error reading data file' });
+      console.log('Current data:', data);
+      return res.status(200).json(JSON.parse(data));
     }
-  } else if (req.method === 'POST') {
-    try {
+
+    if (req.method === 'POST') {
+      console.log('New data:', req.body);
       fs.writeFileSync(dataPath, JSON.stringify(req.body, null, 2));
-      res.status(200).json({ message: 'Data saved successfully' });
-    } catch (error) {
-      res.status(500).json({ error: 'Error saving data' });
+      
+      // Verifikasi perubahan
+      const updatedData = fs.readFileSync(dataPath, 'utf8');
+      console.log('Updated data:', updatedData);
+      
+      return res.status(200).json({ 
+        message: 'Data saved successfully',
+        data: JSON.parse(updatedData)
+      });
     }
-  } else {
+
     res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+
+  } catch (error) {
+    console.error('Error:', error);
+    return res.status(500).json({ 
+      error: 'Server error',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
